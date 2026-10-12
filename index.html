@@ -2,724 +2,954 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Viewport untuk ukuran yang pas di mobile, mencegah zoom yang tidak disengaja -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Petualangan Detektif Pola Bilangan</title>
+    <!-- Memuat Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Font 8-bit Retro -->
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    
     <style>
         :root {
-            --bg-color: #1a1a2e;
-            --panel-bg: #16213e;
-            --border-color: #0f3460;
-            --text-color: #e94560;
-            --text-light: #fff;
-            --btn-bg: #e94560;
-            --btn-hover: #ff6b81;
-            --btn-disabled: #555;
-            --correct: #4cd137;
-            --wrong: #e84118;
-        }
-
-        * {
-            box-sizing: border-box;
-            font-family: 'Press Start 2P', cursive;
-            user-select: none;
+            --bg-color: #0f0f1b;
+            --primary-dark: #2d1b11;
+            --primary-light: #8d6e63;
+            --accent: #d4a373;
+            --text-color: #fefae0;
+            --success: #4ade80;
+            --danger: #f87171;
         }
 
         body {
-            margin: 0;
-            padding: 0;
             background-color: #000;
+            color: var(--text-color);
+            font-family: 'Press Start 2P', cursive;
+            margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            color: var(--text-light);
-            overflow: hidden;
+            min-height: 100vh;
+            overflow: hidden; /* Mencegah scrolling browser utama */
         }
 
-        /* Container Game ala Layar Konsol Retro */
+        /* Container utama game (ukuran rasio mobile portrait) */
         #game-container {
             width: 100%;
-            max-width: 800px;
-            height: 100%;
-            max-height: 600px;
+            height: 100vh;
+            max-width: 480px; /* Ukuran maksimal seperti layar HP besar */
             background-color: var(--bg-color);
             position: relative;
-            border: 4px solid var(--border-color);
-            box-shadow: 0 0 20px rgba(233, 69, 96, 0.3);
             overflow: hidden;
+            box-shadow: 0 0 20px rgba(212, 163, 115, 0.2);
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Scanline Effect */
-        #game-container::after {
-            content: " ";
-            display: block;
-            position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2;
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
-        }
-
-        .screen {
+        /* Scanline effect untuk nuansa CRT/Retro */
+        .scanlines {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            display: none;
-            flex-direction: column;
-            padding: 20px;
-            z-index: 1;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 50;
         }
 
+        /* Utility classes untuk tombol bergaya pixel */
+        .pixel-btn {
+            background-color: var(--primary-dark);
+            color: var(--accent);
+            border: 4px solid var(--primary-light);
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            transition: all 0.1s;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.8);
+            position: relative;
+        }
+        
+        .pixel-btn:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0px 0px 0px rgba(0,0,0,0.8);
+        }
+
+        .pixel-btn.disabled {
+            background-color: #333;
+            border-color: #555;
+            color: #777;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.5);
+        }
+
+        .pixel-panel {
+            background-color: rgba(45, 27, 17, 0.9);
+            border: 4px solid var(--primary-light);
+            padding: 1.5rem;
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.9);
+        }
+
+        /* Screen management */
+        .screen {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 1rem;
+            overflow-y: auto;
+            z-index: 10;
+        }
         .screen.active {
             display: flex;
         }
 
-        h1, h2, h3 {
-            text-align: center;
-            color: var(--text-color);
-            text-shadow: 2px 2px 0px #000;
-            line-height: 1.5;
-        }
+        /* Sembunyikan scrollbar tapi tetap bisa scroll */
+        .screen::-webkit-scrollbar { display: none; }
+        .screen { -ms-overflow-style: none; scrollbar-width: none; }
 
-        h1 { font-size: 24px; margin-top: 40px; }
-        h2 { font-size: 18px; margin-bottom: 20px; }
-        p { font-size: 12px; line-height: 1.8; text-align: center; }
-
-        .btn {
-            background-color: var(--btn-bg);
-            color: white;
-            border: 4px solid #fff;
-            padding: 15px 20px;
-            font-size: 14px;
-            cursor: pointer;
-            text-align: center;
-            text-transform: uppercase;
-            margin: 10px auto;
-            width: 80%;
-            max-width: 300px;
-            transition: transform 0.1s;
-        }
-
-        .btn:active { transform: scale(0.95); }
-        .btn:hover { background-color: var(--btn-hover); }
-        .btn:disabled {
-            background-color: var(--btn-disabled);
-            border-color: #888;
-            color: #ccc;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* World Map Styles */
-        .map-container {
-            flex: 1;
-            position: relative;
-            background: url('data:image/svg+xml;utf8,<svg width="40" height="40" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="40" fill="%231a1a2e"/><path d="M0 40 L40 0" stroke="%2316213e" stroke-width="2"/></svg>');
-            border: 2px solid var(--border-color);
-            margin: 10px 0;
-        }
-
+        /* Styling Map Nodes */
         .map-node {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background-color: var(--btn-disabled);
-            border: 3px solid #fff;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
+            background-color: var(--primary-dark);
+            border: 4px solid #555;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 10px;
-            cursor: not-allowed;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 4px 0px rgba(0,0,0,0.5);
+            font-size: 1rem;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+            transition: all 0.2s;
         }
-
         .map-node.unlocked {
-            background-color: var(--btn-bg);
-            cursor: pointer;
-            animation: pulse 2s infinite;
+            border-color: var(--accent);
+            box-shadow: 0 0 15px var(--accent);
+            animation: pulse-node 2s infinite;
         }
-        
         .map-node.completed {
-            background-color: var(--correct);
-            border-color: #fff;
-            cursor: pointer;
+            border-color: var(--success);
+            background-color: var(--success);
+            color: #000;
+            box-shadow: none;
             animation: none;
         }
+        
+        @keyframes pulse-node {
+            0% { box-shadow: 0 0 0 0 rgba(212, 163, 115, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(212, 163, 115, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(212, 163, 115, 0); }
+        }
 
-        .node-label {
+        /* Garis penghubung map */
+        .map-path {
             position: absolute;
-            top: 25px;
-            font-size: 10px;
-            white-space: nowrap;
-            color: #fff;
-            background: rgba(0,0,0,0.8);
-            padding: 4px;
+            background-color: #555;
+            z-index: 1;
+        }
+        .map-path.unlocked {
+            background-color: var(--accent);
         }
 
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(233, 69, 96, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(233, 69, 96, 0); }
-        }
-
-        /* Gameplay Area */
-        .question-box {
-            background-color: var(--panel-bg);
-            border: 4px solid var(--border-color);
-            padding: 20px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            line-height: 2;
-            text-align: center;
-        }
-
-        .input-area {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-        }
-
-        input[type="number"], input[type="text"], textarea {
+        /* Text Input styling */
+        .pixel-input {
             background: #000;
-            border: 4px solid var(--btn-bg);
-            color: #fff;
-            padding: 15px;
-            font-size: 18px;
+            border: 4px solid var(--primary-light);
+            color: var(--success);
+            font-family: 'Press Start 2P', cursive;
+            padding: 1rem;
+            width: 100%;
             text-align: center;
-            width: 80%;
-            max-width: 300px;
+            font-size: 1.2rem;
             outline: none;
         }
 
-        textarea {
-            text-align: left;
-            font-size: 12px;
-            resize: none;
-            height: 100px;
+        .typewriter {
+            overflow: hidden;
+            border-right: .15em solid var(--accent);
+            white-space: pre-wrap;
+            margin: 0 auto;
+            letter-spacing: .1em;
+            animation: typing 3s steps(40, end), blink-caret .75s step-end infinite;
         }
 
-        .options-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            width: 100%;
-            max-width: 400px;
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: var(--accent); }
         }
 
-        .progress-bar {
-            width: 100%;
-            height: 10px;
-            background: #000;
-            border: 2px solid var(--border-color);
-            margin-top: auto;
+        /* Floating icons */
+        .float-anim {
+            animation: float 3s ease-in-out infinite;
         }
-        .progress-fill {
-            height: 100%;
-            background: var(--correct);
-            width: 0%;
-            transition: width 0.3s;
-        }
-
-        /* Top Bar */
-        .top-bar {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            margin-bottom: 10px;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 10px;
-        }
-        
-        .badge {
-            font-size: 40px;
-            text-align: center;
-            margin: 20px 0;
-            filter: drop-shadow(0 0 10px gold);
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
         }
     </style>
 </head>
 <body>
 
-<div id="game-container">
-    
-    <!-- Layar 1: Beranda -->
-    <div id="screen-beranda" class="screen active">
-        <h1>PETUALANGAN DETEKTIF<br>POLA BILANGAN</h1>
-        <p style="margin-top: 30px; color: #888;">SEBUAH MEDIA PEMBELAJARAN INTERAKTIF</p>
-        <p>Bantu Detektif memecahkan misteri dengan kekuatan matematika!</p>
-        <div style="flex: 1;"></div>
-        <button class="btn" onclick="GameApp.startGame()">Mulai Investigasi</button>
-        <button class="btn" onclick="GameApp.showScreen('screen-petunjuk')" style="background-color: var(--panel-bg);">Petunjuk</button>
-    </div>
+    <div id="game-container">
+        <div class="scanlines"></div>
 
-    <!-- Layar 2: Petunjuk & Tujuan -->
-    <div id="screen-petunjuk" class="screen">
-        <h2>PETUNJUK & TUJUAN</h2>
-        <div class="question-box" style="text-align: left; font-size: 10px;">
-            <p>1. Selesaikan setiap misi secara berurutan di Peta Investigasi.</p>
-            <p>2. Analisis pola angkanya (apakah ditambah, dikurangi, atau dikali).</p>
-            <p>3. Jawab tantangan untuk mendapatkan lencana Detektif Emas.</p>
-            <p><br><strong>Tujuan:</strong> Siswa mampu mengenali, memprediksi, dan menyelesaikan masalah terkait pola bilangan.</p>
+        <!-- Audio Control -->
+        <div class="absolute top-4 right-4 z-50">
+            <button id="btn-audio" class="text-xl opacity-70 hover:opacity-100" onclick="toggleAudio()">🔇</button>
         </div>
-        <button class="btn" onclick="GameApp.showScreen('screen-beranda')">Kembali</button>
-    </div>
 
-    <!-- Layar 3: Peta (World Map) -->
-    <div id="screen-map" class="screen">
-        <div class="top-bar">
-            <span>MAP INVESTIGASI</span>
-            <span id="map-score">Skor: 0</span>
-        </div>
-        <div class="map-container" id="map-container">
-            <!-- Node di-generate oleh JS -->
-        </div>
-    </div>
-
-    <!-- Layar 4: Materi -->
-    <div id="screen-materi" class="screen">
-        <h2>ARSIP KASUS (MATERI)</h2>
-        <div class="question-box" style="text-align: left; font-size: 10px; height: 300px; overflow-y: auto;">
-            <p><strong>Pola Bilangan</strong> adalah susunan angka yang memiliki aturan tertentu.</p>
-            <p>- <strong>Pola Membesar:</strong> Angkanya makin besar (biasanya ditambah atau dikali).<br>Contoh: 2, 4, 6, 8 (+2)</p>
-            <p>- <strong>Pola Mengecil:</strong> Angkanya makin kecil (biasanya dikurangi atau dibagi).<br>Contoh: 20, 15, 10, 5 (-5)</p>
-            <p><br>Pahami aturan ini untuk menyelesaikan misi selanjutnya, Detektif!</p>
-        </div>
-        <button class="btn" onclick="GameApp.completeMateri()">Saya Siap!</button>
-    </div>
-
-    <!-- Layar 5: Gameplay (Misi 1-3, Game, Tantangan, Kuis) -->
-    <div id="screen-gameplay" class="screen">
-        <div class="top-bar">
-            <span id="gameplay-title">Misi 1</span>
-            <span id="gameplay-counter">Soal 1/3</span>
-        </div>
-        <div class="question-box" id="question-text">
-            Memuat teka-teki...
-        </div>
-        <div class="input-area" id="input-container">
-            <!-- Input text atau tombol pilihan ganda akan muncul di sini -->
-        </div>
-        <div style="flex:1;"></div>
-        <div class="progress-bar"><div class="progress-fill" id="gameplay-progress"></div></div>
-    </div>
-
-    <!-- Layar 6: Refleksi -->
-    <div id="screen-refleksi" class="screen">
-        <h2>LAPORAN DETEKTIF (REFLEKSI)</h2>
-        <p>Bagaimana perasaanmu setelah menyelesaikan misi hari ini? Apa yang paling sulit?</p>
-        <textarea id="refleksi-input" placeholder="Tulis laporanmu di sini..."></textarea>
-        <div style="flex:1;"></div>
-        <button class="btn" onclick="GameApp.submitRefleksi()">Kirim Laporan</button>
-    </div>
-
-    <!-- Layar 7: Penghargaan -->
-    <div id="screen-penghargaan" class="screen">
-        <h2>MISI SELESAI!</h2>
-        <div class="badge">🌟</div>
-        <p>Selamat Detektif!<br>Kamu telah memecahkan semua kasus.</p>
-        <h3 id="final-score" style="color: var(--correct); margin: 20px 0;">Skor: 100</h3>
-        <button class="btn" onclick="GameApp.resetGame()">Main Lagi (Reset)</button>
-    </div>
-
-</div>
-
-<!-- ========================================== -->
-<!-- MODUL SOAL: LOGIKA PROSEDURAL (GENERATOR)  -->
-<!-- ========================================== -->
-<script id="modul-soal">
-const ModulSoal = {
-    // Fungsi bantuan untuk angka acak
-    rand: function(min, max) {
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    },
-
-    // Generator utama per level
-    generateLevel: function(levelId) {
-        let questions = [];
-        let totalQuestions = (levelId === 'kuis') ? 5 : 3; // Kuis 5 soal, sisanya 3 soal
-
-        for (let i = 0; i < totalQuestions; i++) {
-            questions.push(this.createSingleQuestion(levelId));
-        }
-        return questions;
-    },
-
-    // Membangkitkan 1 soal berdasarkan ID Misi/Level
-    createSingleQuestion: function(levelId) {
-        // Jika kuis, pilih tipe secara acak dari tipe lain
-        if (levelId === 'kuis') {
-            const types = ['misi1', 'misi2', 'misi3', 'game', 'tantangan'];
-            levelId = types[this.rand(0, types.length - 1)];
-        }
-
-        let start, diff, answer, seq, options;
-
-        switch (levelId) {
-            case 'misi1':
-                // Misi 1: Mengenal Pola (Deret sederhana, cari angka berikutnya)
-                start = this.rand(2, 12);
-                diff = this.rand(2, 5);
-                seq = [start, start + diff, start + diff * 2, start + diff * 3];
-                answer = start + diff * 4;
-                return {
-                    text: `Identifikasi polanya dan temukan angka berikutnya:\n\n${seq.join(', ')}, ...?`,
-                    type: 'input',
-                    answer: answer.toString()
-                };
-
-            case 'misi2':
-                // Misi 2: Angka yang Hilang (Bolong di tengah)
-                start = this.rand(10, 30);
-                diff = this.rand(4, 9);
-                answer = start + diff * 2;
-                seq = [start, start + diff, "?", start + diff * 3, start + diff * 4];
-                return {
-                    text: `Ada angka yang hilang di tengah!\nBerapa angka yang tepat?\n\n${seq.join(', ')}`,
-                    type: 'input',
-                    answer: answer.toString()
-                };
-
-            case 'misi3':
-                // Misi 3: Pola Mengecil atau Perkalian (Pilihan ganda)
-                let isPerkalian = Math.random() > 0.5;
-                if (isPerkalian) {
-                    start = this.rand(2, 5);
-                    let ratio = this.rand(2, 3);
-                    seq = [start, start * ratio, start * Math.pow(ratio, 2), start * Math.pow(ratio, 3)];
-                    answer = start * Math.pow(ratio, 4);
-                } else {
-                    start = this.rand(80, 150);
-                    diff = this.rand(5, 12);
-                    seq = [start, start - diff, start - diff * 2, start - diff * 3];
-                    answer = start - diff * 4;
-                }
-                // Buat pengecoh
-                options = [answer, answer + diff, answer - 2, answer + 5].sort(() => Math.random() - 0.5);
-                
-                return {
-                    text: `Level lebih sulit! Temukan angka selanjutnya:\n\n${seq.join(', ')}, ...`,
-                    type: 'choice',
-                    answer: answer.toString(),
-                    options: options.map(String)
-                };
-
-            case 'game':
-                // Game: Permainan Interaktif (Pola ganda/berselang)
-                start = this.rand(1, 10);
-                let diffA = this.rand(1, 3);
-                let diffB = this.rand(4, 6);
-                // Pola: +A, +B, +A, +B
-                seq = [start, start + diffA, start + diffA + diffB, start + diffA * 2 + diffB];
-                answer = start + diffA * 2 + diffB * 2;
-                
-                options = [answer, answer - 1, answer + 2, answer - 3].sort(() => Math.random() - 0.5);
-                return {
-                    text: `AWAS POLA GANDA! Retas kodenya:\n\n${seq.join(', ')}, ...`,
-                    type: 'choice',
-                    answer: answer.toString(),
-                    options: options.map(String)
-                };
-
-            case 'tantangan':
-                // Tantangan: Soal Cerita (Kontekstual)
-                const names = ["Andi", "Siti", "Budi", "Dina", "Edo"];
-                const name = names[this.rand(0, names.length - 1)];
-                start = this.rand(10, 50) * 100; // Misal 1000 - 5000
-                diff = this.rand(5, 10) * 100;  // Misal 500 - 1000
-                answer = start + diff * 3; // Hari ke-4
-                
-                return {
-                    text: `Kasus Warga: Hari 1 ${name} menabung Rp${start}. Hari 2 ia menabung Rp${start+diff}, Hari 3 Rp${start+diff*2}. Jika polanya tetap, berapa tabungannya di Hari ke-4?\n(Tulis angkanya saja tanpa titik)`,
-                    type: 'input',
-                    answer: answer.toString()
-                };
-        }
-    }
-};
-</script>
-
-<!-- ========================================== -->
-<!-- MODUL UTAMA: MESIN UI, AUDIO, DAN LOGIKA   -->
-<!-- ========================================== -->
-<script id="modul-utama">
-const GameApp = {
-    // Definisi Node di Map
-    mapNodes: [
-        { id: 'materi', label: 'Materi', x: 20, y: 80, type: 'info' },
-        { id: 'misi1', label: 'Misi 1', x: 35, y: 60, type: 'play' },
-        { id: 'misi2', label: 'Misi 2', x: 65, y: 65, type: 'play' },
-        { id: 'misi3', label: 'Misi 3', x: 80, y: 40, type: 'play' },
-        { id: 'game', label: 'Game', x: 50, y: 30, type: 'play' },
-        { id: 'tantangan', label: 'Tantangan', x: 25, y: 20, type: 'play' },
-        { id: 'kuis', label: 'Kuis Akhir', x: 50, y: 10, type: 'play' },
-        { id: 'refleksi', label: 'Refleksi', x: 80, y: 15, type: 'form' },
-        { id: 'penghargaan', label: 'Lencana', x: 90, y: 80, type: 'end' }
-    ],
-    
-    state: {
-        unlockedIndex: 0,
-        score: 0,
-        currentStageId: null,
-        currentQuestions: [],
-        currentQuestionIndex: 0
-    },
-
-    audioCtx: null,
-
-    // --- INISIALISASI ---
-    init: function() {
-        this.loadProgress();
-        this.renderMap();
-    },
-
-    loadProgress: function() {
-        const saved = localStorage.getItem('detektifProgress');
-        if (saved) {
-            const data = JSON.parse(saved);
-            this.state.unlockedIndex = data.unlockedIndex || 0;
-            this.state.score = data.score || 0;
-        }
-    },
-
-    saveProgress: function() {
-        localStorage.setItem('detektifProgress', JSON.stringify({
-            unlockedIndex: this.state.unlockedIndex,
-            score: this.state.score
-        }));
-    },
-
-    // --- AUDIO SYSTEM (Sintetis) ---
-    initAudio: function() {
-        if (!this.audioCtx) {
-            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (this.audioCtx.state === 'suspended') {
-            this.audioCtx.resume();
-        }
-    },
-
-    playSound: function(type) {
-        if (!this.audioCtx) return;
-        const osc = this.audioCtx.createOscillator();
-        const gain = this.audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(this.audioCtx.destination);
-
-        if (type === 'correct') {
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(440, this.audioCtx.currentTime); // A4
-            osc.frequency.exponentialRampToValueAtTime(880, this.audioCtx.currentTime + 0.1);
-            gain.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.3);
-            osc.start(); osc.stop(this.audioCtx.currentTime + 0.3);
-        } else if (type === 'wrong') {
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(150, this.audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(100, this.audioCtx.currentTime + 0.2);
-            gain.gain.setValueAtTime(0.1, this.audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.2);
-            osc.start(); osc.stop(this.audioCtx.currentTime + 0.2);
-        }
-    },
-
-    // --- UI & NAVIGASI ---
-    showScreen: function(screenId) {
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-        document.getElementById(screenId).classList.add('active');
-    },
-
-    startGame: function() {
-        this.initAudio();
-        this.showScreen('screen-map');
-    },
-
-    renderMap: function() {
-        const container = document.getElementById('map-container');
-        document.getElementById('map-score').innerText = 'Skor: ' + this.state.score;
-        container.innerHTML = '';
-
-        this.mapNodes.forEach((node, index) => {
-            const el = document.createElement('div');
-            el.className = 'map-node';
-            el.style.left = node.x + '%';
-            el.style.top = node.y + '%';
+        <!-- SCREEN: Main Menu (Beranda) -->
+        <div id="screen-menu" class="screen active justify-center items-center bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjMGYwZjFiIj48L3JlY3Q+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMxYTFhMzAiPjwvcmVjdD4KPC9zdmc+')]">
+            <div class="text-center mb-10 float-anim">
+                <div class="text-4xl mb-4">🕵️‍♂️</div>
+                <h1 class="text-2xl leading-loose text-[var(--accent)] text-shadow-md">PETUALANGAN<br>DETEKTIF<br>POLA BILANGAN</h1>
+            </div>
             
-            if (index < this.state.unlockedIndex) {
-                el.classList.add('completed');
-                el.innerHTML = '✔';
-            } else if (index === this.state.unlockedIndex) {
-                el.classList.add('unlocked');
-                el.innerHTML = '!';
+            <div class="flex flex-col gap-4 w-3/4 max-w-[250px]">
+                <button class="pixel-btn" onclick="startGame()">MULAI KASUS</button>
+                <button class="pixel-btn" onclick="showScreen('screen-petunjuk')">PETUNJUK</button>
+                <button class="pixel-btn" onclick="showScreen('screen-tujuan')">TUJUAN</button>
+                <button class="pixel-btn text-xs mt-4 !bg-red-900 !border-red-500 !text-white" onclick="resetData()">RESET DATA</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: Petunjuk -->
+        <div id="screen-petunjuk" class="screen justify-center items-center">
+            <div class="pixel-panel w-full">
+                <h2 class="text-xl text-[var(--accent)] mb-4 text-center">PETUNJUK</h2>
+                <p class="text-xs leading-loose mb-4">
+                    1. Pecahkan misteri pola bilangan untuk membuka area baru.<br><br>
+                    2. Kumpulkan poin dan lencana emas di setiap misi.<br><br>
+                    3. Buka Peta untuk melihat progres investigasi.<br><br>
+                    4. Progres akan otomatis tersimpan.
+                </p>
+                <button class="pixel-btn w-full mt-4" onclick="showScreen('screen-menu')">KEMBALI</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: Tujuan -->
+        <div id="screen-tujuan" class="screen justify-center items-center">
+            <div class="pixel-panel w-full">
+                <h2 class="text-xl text-[var(--accent)] mb-4 text-center">TUJUAN</h2>
+                <p class="text-[10px] leading-relaxed mb-4 text-gray-300">
+                    🔍 Peserta didik mampu mengenal dan mengidentifikasi pola bilangan sederhana.<br><br>
+                    🔍 Mampu menentukan angka yang hilang dalam urutan.<br><br>
+                    🔍 Mampu memprediksi bilangan berikutnya berdasarkan aturan pola.<br><br>
+                    🔍 Menerapkan konsep dalam pemecahan masalah (game & tantangan).
+                </p>
+                <button class="pixel-btn w-full mt-4" onclick="showScreen('screen-menu')">KEMBALI</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: World Map -->
+        <div id="screen-map" class="screen bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMTYxNjI1Ij48L3JlY3Q+CjxwYXRoIGQ9Ik0wIDBMOCA4Wk04IDBMMCA4WiIgc3Ryb2tlPSIjMWExYTMwIiBzdHJva2Utd2lkdGg9IjEiPjwvcGF0aD4KPC9zdmc+')]">
+            <div class="flex justify-between items-center mb-6 bg-black p-2 border-2 border-[var(--primary-light)]">
+                <div class="text-xs">SKOR: <span id="ui-score" class="text-[var(--accent)]">0</span></div>
+                <button class="text-xs px-2 py-1 bg-red-900 border border-red-500" onclick="showScreen('screen-menu')">MENU</button>
+            </div>
+            
+            <h2 class="text-center text-[var(--accent)] mb-8">PETA INVESTIGASI</h2>
+            
+            <!-- Map Container -->
+            <div class="relative flex-1 w-full flex justify-center pb-20">
+                <div id="map-nodes-container" class="relative w-full max-w-[300px] h-full">
+                    <!-- Nodes will be generated here by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: Level / Gameplay -->
+        <div id="screen-level" class="screen">
+            <div class="flex justify-between items-center mb-4">
+                <button class="text-[10px] bg-gray-800 p-2 border border-gray-600" onclick="showScreen('screen-map')">◀ PETA</button>
+                <div class="flex flex-col items-end">
+                    <div id="level-title" class="text-xs text-[var(--accent)]">MISI 1</div>
+                    <div id="level-counter" class="text-[8px] mt-1 text-gray-400">Soal 1/3</div>
+                </div>
+            </div>
+
+            <div class="pixel-panel flex-1 flex flex-col relative">
+                <!-- Konten akan diinjeksi di sini -->
+                <div id="level-content" class="flex-1 flex flex-col justify-center items-center text-center">
+                    <!-- Dynamic content -->
+                </div>
+
+                <!-- Feedback Overlay -->
+                <div id="feedback-overlay" class="absolute inset-0 bg-black bg-opacity-90 flex flex-col justify-center items-center hidden z-20">
+                    <div id="feedback-icon" class="text-6xl mb-4">✅</div>
+                    <div id="feedback-text" class="text-xl mb-6 text-center leading-loose">TEPAT!</div>
+                    <button class="pixel-btn" id="btn-next-level">LANJUTKAN</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: Refleksi -->
+        <div id="screen-refleksi" class="screen justify-center">
+            <div class="pixel-panel w-full">
+                <h2 class="text-lg text-[var(--accent)] mb-4 text-center">REFLEKSI DETEKTIF</h2>
+                <p class="text-xs mb-4">Laporan Investigasi: Apa yang paling menantang dari kasus pola bilangan ini?</p>
+                <!-- Textarea ini akan selalu dikosongkan oleh JS saat screen dibuka -->
+                <textarea id="refleksi-input" class="w-full h-32 bg-black border-2 border-[var(--primary-light)] text-white p-2 font-['Press_Start_2P'] text-[10px] mb-4" placeholder="Ketik laporanmu di sini..."></textarea>
+                <button class="pixel-btn w-full" onclick="submitRefleksi()">KIRIM LAPORAN</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: Penghargaan -->
+        <div id="screen-penghargaan" class="screen justify-center items-center">
+            <div class="pixel-panel w-full text-center relative overflow-hidden">
+                <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PGNpcmNsZSBjeD0iNSIgY3k9IjUiIHI9IjEiIGZpbGw9IiNGRkQ3MDAiIG9wYWNpdHk9IjAuMiIvPjwvc3ZnPg==')] z-0"></div>
+                <div class="relative z-10">
+                    <h2 class="text-xl text-[var(--accent)] mb-2">KASUS DITUTUP</h2>
+                    <div class="text-6xl my-6 float-anim">🏆</div>
+                    <p class="text-xs mb-2">Total Skor Detektif:</p>
+                    <div id="final-score" class="text-3xl text-[var(--success)] mb-6">0</div>
+                    
+                    <div class="text-[10px] mb-2 text-gray-400">Lencana Diperoleh:</div>
+                    <div id="badges-container" class="flex justify-center gap-2 mb-8 flex-wrap">
+                        <!-- Badges go here -->
+                    </div>
+
+                    <button class="pixel-btn w-full text-xs" onclick="resetData()">MAIN LAGI (RESET)</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * ==========================================
+         * MODUL SOAL: GENERATOR PROSEDURAL
+         * Modul ini terpisah dari mesin game utama.
+         * Secara otomatis membuat soal yang berubah-ubah.
+         * ==========================================
+         */
+        const ModulSoal = {
+            // Helper: Acak angka dalam rentang min - max
+            rand: function(min, max) {
+                return Math.floor(Math.random() * (max - min + 1)) + min;
+            },
+
+            // Helper: Acak urutan array
+            shuffle: function(array) {
+                return array.sort(() => Math.random() - 0.5);
+            },
+
+            // Fungsi utama membangkitkan Array soal untuk suatu Level
+            generateLevel: function(levelId, count) {
+                let questions = [];
+                for (let i = 0; i < count; i++) {
+                    questions.push(this.createSingleQuestion(levelId));
+                }
+                return questions;
+            },
+
+            // Logika spesifik per level
+            createSingleQuestion: function(levelId) {
+                // Untuk Kuis, ambil tipe dari misi-misi sebelumnya secara acak
+                if (levelId === 'kuis') {
+                    const types = ['misi1', 'misi2', 'misi3', 'game', 'tantangan'];
+                    levelId = types[this.rand(0, types.length - 1)];
+                }
+
+                let start, diff, answer, seq, options;
+
+                switch (levelId) {
+                    case 'misi1':
+                        // Misi 1: Mengenal Pola Dasar (+ / -) [Multiple Choice]
+                        start = this.rand(2, 20);
+                        diff = this.rand(2, 6);
+                        let isAdd = Math.random() > 0.5;
+                        
+                        if (isAdd) {
+                            seq = [start, start + diff, start + diff * 2, start + diff * 3];
+                            answer = start + diff * 4;
+                        } else {
+                            start = this.rand(50, 100);
+                            seq = [start, start - diff, start - diff * 2, start - diff * 3];
+                            answer = start - diff * 4;
+                        }
+
+                        options = [answer, answer + 2, answer - diff, answer + diff + 1];
+                        options = this.shuffle([...new Set(options)]); // Ensure unique
+                        while(options.length < 4) options.push(options[0] + this.rand(1,5)); // Fallback
+
+                        return {
+                            type: 'mcq',
+                            question: `Amati jejak berikut:\n\n${seq.join(', ')}, ...\n\nAngka berapa selanjutnya?`,
+                            options: options.map(String),
+                            correctAnswer: options.indexOf(answer)
+                        };
+
+                    case 'misi2':
+                        // Misi 2: Angka Hilang di Tengah [Input]
+                        start = this.rand(10, 40);
+                        diff = this.rand(4, 10);
+                        answer = start + diff * 2;
+                        seq = [start, start + diff, '?', start + diff * 3, start + diff * 4];
+                        
+                        return {
+                            type: 'input',
+                            question: `Sandi brankas ada yang terhapus:\n\n${seq.join(', ')}\n\nKetik angka yang hilang!`,
+                            correctAnswer: answer.toString()
+                        };
+
+                    case 'misi3':
+                        // Misi 3: Pola Perkalian / Kompleks [Select and Place]
+                        start = this.rand(2, 5);
+                        let multiplier = this.rand(2, 3);
+                        seq = [start, start * multiplier, start * Math.pow(multiplier, 2), start * Math.pow(multiplier, 3)];
+                        answer = start * Math.pow(multiplier, 4);
+
+                        options = [answer, answer + multiplier, answer - 2, start * Math.pow(multiplier, 5)];
+                        options = this.shuffle([...new Set(options)]);
+                        while(options.length < 4) options.push(options[0] + this.rand(10,20));
+
+                        return {
+                            type: 'selectPlace',
+                            question: `Pola ini lebih sulit. Jejaknya:\n\n${seq.join(', ')}, [ ? ]\n\nPilih angka yang tepat!`,
+                            options: options.map(String),
+                            correctAnswer: options.indexOf(answer)
+                        };
+
+                    case 'game':
+                        // Game Waktu: Pola Ganda [Timed MCQ]
+                        start = this.rand(5, 20);
+                        let diffA = this.rand(1, 3);
+                        let diffB = this.rand(4, 8);
+                        // Pola: +A, +B, +A, +B
+                        seq = [start, start + diffA, start + diffA + diffB, start + diffA * 2 + diffB];
+                        answer = start + diffA * 2 + diffB * 2;
+
+                        options = [answer, answer - 1, answer + 2, answer - 3];
+                        options = this.shuffle([...new Set(options)]);
+                        while(options.length < 4) options.push(options[0] + 5);
+
+                        return {
+                            type: 'timedGame',
+                            question: `RETAS SISTEM! Awas pola ganda:\n\n${seq.join(', ')}, ...`,
+                            options: options.map(String),
+                            correctAnswer: options.indexOf(answer),
+                            timeLimit: 15 // 15 detik
+                        };
+
+                    case 'tantangan':
+                        // Tantangan: Kontekstual Soal Cerita [MCQ]
+                        const names = ["Detektif A", "Tersangka B", "Saksi C"];
+                        const name = names[this.rand(0, names.length - 1)];
+                        start = this.rand(5, 10);
+                        diff = this.rand(2, 5);
+                        answer = start + diff * 3; // Hari ke-4
+                        
+                        options = [answer, answer + diff, answer - 1, answer + 2];
+                        options = this.shuffle([...new Set(options)]);
+                        
+                        return {
+                            type: 'mcq',
+                            question: `Hari 1, ${name} menemukan ${start} petunjuk. Hari 2 menemukan ${start+diff}, Hari 3 menemukan ${start+diff*2}. Jika polanya tetap, berapa petunjuk di Hari ke 4?`,
+                            options: options.map(String),
+                            correctAnswer: options.indexOf(answer)
+                        };
+                }
             }
+        };
 
-            const label = document.createElement('div');
-            label.className = 'node-label';
-            label.innerText = node.label;
-            el.appendChild(label);
+        /*
+         * ==========================================
+         * KONFIGURASI LEVEL GAME (PETA)
+         * ==========================================
+         */
+        const GAME_LEVELS = [
+            { id: 'materi', title: 'MATERI: KONSEP', type: 'info', qCount: 1, reward: 0, badge: null, 
+              content: `Halo Detektif!\nKasus kita: 'Pola Bilangan'.\n\nPola bilangan adalah susunan angka yang memiliki aturan.\n\nContoh:\n+2 (ditambah dua)\nx3 (dikali tiga)\n\nPahami polanya, temukan angkanya!` },
+            { id: 'misi1', title: 'MISI 1: MENGENAL', type: 'play', qCount: 3, reward: 100, badge: '🔍' },
+            { id: 'misi2', title: 'MISI 2: ANGKA HILANG', type: 'play', qCount: 3, reward: 150, badge: '🔓' },
+            { id: 'misi3', title: 'MISI 3: SELANJUTNYA', type: 'play', qCount: 3, reward: 200, badge: '👣' },
+            { id: 'game', title: 'GAME: WAKTU', type: 'play', qCount: 3, reward: 300, badge: '⏱️' },
+            { id: 'tantangan', title: 'TANTANGAN', type: 'play', qCount: 3, reward: 200, badge: '🧠' },
+            { id: 'kuis', title: 'KUIS AKHIR', type: 'play', qCount: 5, reward: 250, badge: '⭐' },
+            { id: 'refleksi', title: 'REFLEKSI', type: 'reflection' },
+            { id: 'penghargaan', title: 'PENGHARGAAN', type: 'rewards' }
+        ];
 
-            el.onclick = () => {
-                if (index <= this.state.unlockedIndex) {
-                    this.initAudio();
-                    this.enterNode(index, node);
-                } else {
-                    this.playSound('wrong');
-                }
-            };
-            container.appendChild(el);
-        });
-    },
+        // Audio System
+        let audioCtx;
+        let isMuted = false;
+        let bgmOscillator = null;
+        let bgmGain = null;
 
-    enterNode: function(index, node) {
-        if (node.type === 'info') {
-            this.showScreen('screen-materi');
-        } else if (node.type === 'play') {
-            this.startLevel(node.id, node.label);
-        } else if (node.type === 'form') {
-            // PENTING: Kosongkan area teks refleksi agar di permainan baru tidak terisi jawaban lama
-            document.getElementById('refleksi-input').value = ""; 
-            this.showScreen('screen-refleksi');
-        } else if (node.type === 'end') {
-            document.getElementById('final-score').innerText = 'Skor Akhir: ' + this.state.score;
-            this.showScreen('screen-penghargaan');
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
         }
-    },
 
-    // --- GAMEPLAY LOGIC ---
-    completeMateri: function() {
-        if (this.state.unlockedIndex === 0) this.unlockNext();
-        this.showScreen('screen-map');
-    },
-
-    startLevel: function(levelId, title) {
-        this.state.currentStageId = levelId;
-        // Panggil pembangkit soal prosedural
-        this.state.currentQuestions = ModulSoal.generateLevel(levelId);
-        this.state.currentQuestionIndex = 0;
-        
-        document.getElementById('gameplay-title').innerText = title;
-        this.showScreen('screen-gameplay');
-        this.renderQuestion();
-    },
-
-    renderQuestion: function() {
-        const qIndex = this.state.currentQuestionIndex;
-        const total = this.state.currentQuestions.length;
-        const qData = this.state.currentQuestions[qIndex];
-
-        document.getElementById('gameplay-counter').innerText = `Kasus ${qIndex + 1}/${total}`;
-        document.getElementById('gameplay-progress').style.width = ((qIndex / total) * 100) + '%';
-        document.getElementById('question-text').innerText = qData.text;
-
-        const inputContainer = document.getElementById('input-container');
-        inputContainer.innerHTML = '';
-
-        if (qData.type === 'input') {
-            const inputField = document.createElement('input');
-            inputField.type = 'number';
-            inputField.id = 'answer-input';
-            inputField.placeholder = "Ketik angka...";
+        function playSFX(type) {
+            if (isMuted || !audioCtx) return;
             
-            const submitBtn = document.createElement('button');
-            submitBtn.className = 'btn';
-            submitBtn.innerText = "Jawab";
-            submitBtn.onclick = () => this.checkAnswer(document.getElementById('answer-input').value);
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
 
-            inputContainer.appendChild(inputField);
-            inputContainer.appendChild(submitBtn);
-            inputField.focus();
-        } 
-        else if (qData.type === 'choice') {
-            const grid = document.createElement('div');
-            grid.className = 'options-grid';
-            qData.options.forEach(opt => {
-                const btn = document.createElement('button');
-                btn.className = 'btn';
-                btn.style.width = '100%';
-                btn.innerText = opt;
-                btn.onclick = () => this.checkAnswer(opt);
-                grid.appendChild(btn);
-            });
-            inputContainer.appendChild(grid);
+            if (type === 'click') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.setValueAtTime(800, now + 0.1);
+                osc.frequency.setValueAtTime(1000, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            }
         }
-    },
 
-    checkAnswer: function(userAnswer) {
-        const qData = this.state.currentQuestions[this.state.currentQuestionIndex];
-        
-        if (userAnswer.trim() === qData.answer) {
-            this.playSound('correct');
-            this.state.score += 10;
-            this.state.currentQuestionIndex++;
+        function startBGM() {
+            if (isMuted || !audioCtx || bgmOscillator) return;
+            bgmOscillator = audioCtx.createOscillator();
+            bgmGain = audioCtx.createGain();
+            
+            bgmOscillator.type = 'triangle';
+            bgmGain.gain.value = 0.05; // Ambient volume
+            
+            bgmOscillator.connect(bgmGain);
+            bgmGain.connect(audioCtx.destination);
+            
+            const notes = [130.81, 155.56, 196.00, 155.56]; // C3, D#3, G3, D#3
+            let noteIndex = 0;
+            bgmOscillator.start();
+            
+            setInterval(() => {
+                if(bgmOscillator && !isMuted) {
+                    bgmOscillator.frequency.setTargetAtTime(notes[noteIndex], audioCtx.currentTime, 0.1);
+                    noteIndex = (noteIndex + 1) % notes.length;
+                }
+            }, 1000);
+        }
 
-            if (this.state.currentQuestionIndex >= this.state.currentQuestions.length) {
-                this.completeLevel();
+        function stopBGM() {
+            if (bgmOscillator) {
+                bgmOscillator.stop();
+                bgmOscillator.disconnect();
+                bgmOscillator = null;
+            }
+        }
+
+        function toggleAudio() {
+            initAudio();
+            isMuted = !isMuted;
+            const btn = document.getElementById('btn-audio');
+            if (isMuted) {
+                btn.innerText = '🔇';
+                stopBGM();
             } else {
-                this.renderQuestion();
+                btn.innerText = '🔊';
+                startBGM();
+                playSFX('click');
             }
-        } else {
-            this.playSound('wrong');
-            // Efek goyang (shake) jika salah
-            const box = document.getElementById('gameplay-title').parentElement.parentElement;
-            box.style.transform = 'translate(-10px, 0)';
-            setTimeout(() => box.style.transform = 'translate(10px, 0)', 50);
-            setTimeout(() => box.style.transform = 'translate(-10px, 0)', 100);
-            setTimeout(() => box.style.transform = 'translate(0, 0)', 150);
-            // Kurangi skor jika mau, tapi untuk anak SD mungkin abaikan saja
         }
-    },
 
-    completeLevel: function() {
-        // Cari index node yang sedang dimainkan
-        const currentNodeIndex = this.mapNodes.findIndex(n => n.id === this.state.currentStageId);
-        if (currentNodeIndex === this.state.unlockedIndex) {
-            this.unlockNext();
-        } else {
-            this.showScreen('screen-map');
-            this.renderMap();
+        // State Management
+        let gameState = {
+            currentLevelIndex: 0, // Highest unlocked level
+            score: 0,
+            badges: []
+        };
+        
+        // Active gameplay state
+        let activeLevelIndex = 0;
+        let activeQuestions = [];
+        let currentQIndex = 0;
+        let timerInterval = null;
+
+        const STORAGE_KEY = 'detektifPolaState';
+
+        function loadProgress() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    gameState = JSON.parse(saved);
+                    if(typeof gameState.currentLevelIndex !== 'number') gameState.currentLevelIndex = 0;
+                    if(!gameState.badges) gameState.badges = [];
+                } catch(e) { console.error("Gagal memuat save data"); }
+            }
         }
-    },
 
-    unlockNext: function() {
-        this.state.unlockedIndex++;
-        this.saveProgress();
-        this.showScreen('screen-map');
-        this.renderMap();
-    },
-
-    submitRefleksi: function() {
-        const text = document.getElementById('refleksi-input').value;
-        if (text.trim() === "") {
-            alert("Detektif, mohon isi laporanmu terlebih dahulu!");
-            return;
+        function saveProgress() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
         }
-        // Anggap terkirim. Jika baru pertama kali ke sini, unlock level akhir
-        const currentNodeIndex = this.mapNodes.findIndex(n => n.id === 'refleksi');
-        if (currentNodeIndex === this.state.unlockedIndex) {
-            this.unlockNext();
-        } else {
-            this.showScreen('screen-map');
-            this.renderMap();
+
+        function resetData() {
+            playSFX('click');
+            const screen = document.createElement('div');
+            screen.className = 'absolute inset-0 bg-black bg-opacity-90 z-[100] flex justify-center items-center p-4';
+            screen.innerHTML = `
+                <div class="pixel-panel text-center">
+                    <h3 class="text-red-500 mb-4">HAPUS DATA?</h3>
+                    <p class="text-[10px] mb-6 text-gray-300">Semua progres akan hilang selamanya.</p>
+                    <div class="flex gap-4 justify-center">
+                        <button class="pixel-btn !bg-red-900" id="btn-confirm-reset">YA, HAPUS</button>
+                        <button class="pixel-btn" id="btn-cancel-reset">BATAL</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('game-container').appendChild(screen);
+
+            document.getElementById('btn-confirm-reset').onclick = () => {
+                localStorage.removeItem(STORAGE_KEY);
+                gameState = { currentLevelIndex: 0, score: 0, badges: [] };
+                screen.remove();
+                showScreen('screen-menu');
+            };
+            document.getElementById('btn-cancel-reset').onclick = () => {
+                screen.remove();
+            };
         }
-    },
 
-    resetGame: function() {
-        // Hapus progres lokal agar mulai dari awal lagi (cocok untuk giliran siswa selanjutnya)
-        localStorage.removeItem('detektifProgress');
-        this.state.unlockedIndex = 0;
-        this.state.score = 0;
-        this.renderMap();
-        this.showScreen('screen-beranda');
-    }
-};
+        // Screen Routing
+        function showScreen(screenId) {
+            playSFX('click');
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            if (screenId === 'screen-map') renderMap();
+            else if (screenId === 'screen-penghargaan') renderPenghargaan();
+        }
 
-// Start Initialize
-window.onload = () => {
-    GameApp.init();
-};
-</script>
+        function startGame() {
+            initAudio();
+            if(!isMuted) startBGM();
+            showScreen('screen-map');
+        }
+
+        function renderMap() {
+            document.getElementById('ui-score').innerText = gameState.score;
+            const container = document.getElementById('map-nodes-container');
+            container.innerHTML = '';
+
+            let currentY = 0;
+            const ySpacing = 80;
+            const xPositions = ['20%', '50%', '80%', '50%']; // Zig-zag
+
+            GAME_LEVELS.forEach((level, index) => {
+                const isUnlocked = index <= gameState.currentLevelIndex;
+                const isCompleted = index < gameState.currentLevelIndex;
+                const xPos = xPositions[index % xPositions.length];
+
+                // Connective Path
+                if (index < GAME_LEVELS.length - 1) {
+                    const nextXPos = xPositions[(index + 1) % xPositions.length];
+                    const path = document.createElement('div');
+                    path.className = `map-path ${isCompleted ? 'unlocked' : ''}`;
+                    path.style.top = `${currentY + 24}px`;
+                    path.style.left = xPos;
+                    path.style.width = '2px';
+                    path.style.height = `${ySpacing}px`;
+                    
+                    if (xPos !== nextXPos) {
+                        const isRight = parseInt(nextXPos) > parseInt(xPos);
+                        path.style.transformOrigin = 'top left';
+                        path.style.transform = `rotate(${isRight ? '-30deg' : '30deg'})`;
+                        path.style.height = `${ySpacing * 1.2}px`;
+                    }
+                    container.appendChild(path);
+                }
+
+                // Node Element
+                const node = document.createElement('div');
+                node.className = `map-node absolute ${isUnlocked ? 'unlocked' : ''} ${isCompleted ? 'completed' : ''} shadow-lg`;
+                node.style.top = `${currentY}px`;
+                node.style.left = `calc(${xPos} - 24px)`;
+                
+                if (isCompleted) node.innerHTML = '✓';
+                else if (isUnlocked) node.innerHTML = level.id === 'penghargaan' ? '🏆' : '🔎';
+                else { node.innerHTML = '🔒'; node.style.opacity = '0.5'; }
+
+                node.onclick = () => {
+                    if (isUnlocked) startLevel(index);
+                    else playSFX('wrong');
+                };
+
+                const label = document.createElement('div');
+                label.className = 'absolute text-[8px] whitespace-nowrap text-center text-gray-300 bg-black bg-opacity-70 px-1 mt-14';
+                label.innerText = level.title.split(':')[0];
+                node.appendChild(label);
+
+                container.appendChild(node);
+                currentY += ySpacing;
+            });
+            container.style.height = `${currentY}px`;
+        }
+
+        function startLevel(index) {
+            activeLevelIndex = index;
+            const levelConfig = GAME_LEVELS[index];
+            
+            if (levelConfig.type === 'reflection') {
+                // FIXED: Clear reflection input every time screen opens
+                document.getElementById('refleksi-input').value = "";
+                showScreen('screen-refleksi');
+                return;
+            }
+            if (levelConfig.type === 'rewards') {
+                showScreen('screen-penghargaan');
+                return;
+            }
+
+            document.getElementById('level-title').innerText = levelConfig.title.split(':')[0];
+            
+            // Build Question Array (Procedural or Info)
+            if (levelConfig.type === 'info') {
+                activeQuestions = [{ type: 'info', content: levelConfig.content }];
+            } else {
+                activeQuestions = ModulSoal.generateLevel(levelConfig.id, levelConfig.qCount);
+            }
+            
+            currentQIndex = 0;
+            showScreen('screen-level');
+            renderCurrentQuestion();
+        }
+
+        function renderCurrentQuestion() {
+            clearInterval(timerInterval);
+            document.getElementById('feedback-overlay').classList.add('hidden');
+            
+            const contentDiv = document.getElementById('level-content');
+            contentDiv.innerHTML = '';
+            
+            const qData = activeQuestions[currentQIndex];
+            const totalQ = activeQuestions.length;
+            
+            // Update counter UI
+            const counterUI = document.getElementById('level-counter');
+            if(totalQ > 1) {
+                counterUI.style.display = 'block';
+                counterUI.innerText = `Soal ${currentQIndex + 1}/${totalQ}`;
+            } else {
+                counterUI.style.display = 'none';
+            }
+
+            // Question Box
+            const qBox = document.createElement('div');
+            qBox.className = 'bg-[#1a1a2e] p-4 border-2 border-[#8d6e63] w-full mb-6 rounded-md shadow-inner text-left text-xs leading-loose whitespace-pre-wrap';
+            qBox.innerText = qData.content || qData.question;
+            contentDiv.appendChild(qBox);
+
+            // Inputs based on type
+            if (qData.type === 'info') {
+                const btn = document.createElement('button');
+                btn.className = 'pixel-btn w-full mt-auto';
+                btn.innerText = 'MENGERTI, LANJUTKAN!';
+                btn.onclick = () => submitAnswer(true); // Always correct for info
+                contentDiv.appendChild(btn);
+            } 
+            else if (qData.type === 'mcq') {
+                const optGrid = document.createElement('div');
+                optGrid.className = 'grid grid-cols-1 gap-4 w-full';
+                qData.options.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'pixel-btn w-full text-left !normal-case !text-xs';
+                    btn.innerText = opt;
+                    btn.onclick = () => submitAnswer(i === qData.correctAnswer);
+                    optGrid.appendChild(btn);
+                });
+                contentDiv.appendChild(optGrid);
+            }
+            else if (qData.type === 'input') {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'pixel-input mb-4';
+                input.placeholder = '?';
+                
+                const btn = document.createElement('button');
+                btn.className = 'pixel-btn w-full';
+                btn.innerText = 'JAWAB';
+                btn.onclick = () => submitAnswer(input.value.trim() === qData.correctAnswer);
+                
+                contentDiv.appendChild(input);
+                contentDiv.appendChild(btn);
+            }
+            else if (qData.type === 'selectPlace') {
+                const slotArea = document.createElement('div');
+                slotArea.className = 'text-2xl mb-6 text-gray-500 border-2 border-dashed border-gray-500 p-4 w-full text-center bg-black';
+                slotArea.innerText = '[ PILIH ANGKA ]';
+                
+                const optGrid = document.createElement('div');
+                optGrid.className = 'grid grid-cols-2 gap-4 w-full';
+                qData.options.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'pixel-btn';
+                    btn.innerText = opt;
+                    btn.onclick = () => {
+                        slotArea.innerText = `[ ${opt} ]`;
+                        slotArea.classList.remove('text-gray-500', 'border-gray-500');
+                        slotArea.classList.add('text-white', 'border-[var(--accent)]');
+                        setTimeout(() => submitAnswer(i === qData.correctAnswer), 500);
+                    };
+                    optGrid.appendChild(btn);
+                });
+                contentDiv.appendChild(slotArea);
+                contentDiv.appendChild(optGrid);
+            }
+            else if (qData.type === 'timedGame') {
+                const timerDisplay = document.createElement('div');
+                timerDisplay.className = 'text-2xl text-[var(--danger)] mb-4 animate-pulse';
+                timerDisplay.innerText = `00:${qData.timeLimit.toString().padStart(2, '0')}`;
+                contentDiv.insertBefore(timerDisplay, qBox);
+
+                let timeLeft = qData.timeLimit;
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    timerDisplay.innerText = `00:${timeLeft.toString().padStart(2, '0')}`;
+                    if(timeLeft <= 3) timerDisplay.classList.add('text-red-500', 'scale-110');
+                    if(timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        submitAnswer(false, true);
+                    }
+                }, 1000);
+
+                const optGrid = document.createElement('div');
+                optGrid.className = 'grid grid-cols-2 gap-4 w-full mt-4';
+                qData.options.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'pixel-btn';
+                    btn.innerText = opt;
+                    btn.onclick = () => {
+                        clearInterval(timerInterval);
+                        submitAnswer(i === qData.correctAnswer);
+                    };
+                    optGrid.appendChild(btn);
+                });
+                contentDiv.appendChild(optGrid);
+            }
+        }
+
+        function submitAnswer(isCorrect, isTimeout = false) {
+            const overlay = document.getElementById('feedback-overlay');
+            const icon = document.getElementById('feedback-icon');
+            const text = document.getElementById('feedback-text');
+            const btnNext = document.getElementById('btn-next-level');
+
+            overlay.classList.remove('hidden');
+
+            if (isCorrect) {
+                playSFX('correct');
+                icon.innerText = '✅';
+                text.innerText = (activeQuestions[currentQIndex].type === 'info') ? 'LANJUT!' : 'TEPAT!';
+                text.className = 'text-xl mb-6 text-[var(--success)]';
+                btnNext.innerText = 'LANJUTKAN';
+                
+                btnNext.onclick = () => {
+                    currentQIndex++;
+                    if (currentQIndex < activeQuestions.length) {
+                        // Go to next question in this loop
+                        renderCurrentQuestion();
+                    } else {
+                        // Level Complete
+                        handleLevelComplete();
+                    }
+                };
+            } else {
+                playSFX('wrong');
+                icon.innerText = '❌';
+                text.innerText = isTimeout ? 'WAKTU HABIS!' : 'SANDI SALAH!';
+                text.className = 'text-xl mb-6 text-[var(--danger)] text-center';
+                btnNext.innerText = 'COBA LAGI';
+                
+                btnNext.onclick = () => {
+                    overlay.classList.add('hidden');
+                    // Reset interval on retry (if it was timed game)
+                    renderCurrentQuestion();
+                };
+            }
+        }
+
+        function handleLevelComplete() {
+            const levelConfig = GAME_LEVELS[activeLevelIndex];
+            
+            // Add rewards only if this was the highest unlocked level
+            if (activeLevelIndex === gameState.currentLevelIndex) {
+                if (levelConfig.reward) gameState.score += levelConfig.reward;
+                if (levelConfig.badge && !gameState.badges.includes(levelConfig.badge)) {
+                    gameState.badges.push(levelConfig.badge);
+                }
+                gameState.currentLevelIndex++;
+                saveProgress();
+            }
+            showScreen('screen-map');
+        }
+
+        function submitRefleksi() {
+            const input = document.getElementById('refleksi-input').value;
+            if (input.trim() === '') {
+                const btn = document.querySelector('#screen-refleksi button');
+                const oriText = btn.innerText;
+                btn.innerText = 'ISI LAPORAN DULU!';
+                btn.classList.add('!bg-red-800');
+                playSFX('wrong');
+                setTimeout(() => {
+                    btn.innerText = oriText;
+                    btn.classList.remove('!bg-red-800');
+                }, 2000);
+                return;
+            }
+            
+            playSFX('correct');
+            if (activeLevelIndex === gameState.currentLevelIndex) {
+                gameState.currentLevelIndex++;
+                saveProgress();
+            }
+            showScreen('screen-penghargaan');
+        }
+
+        function renderPenghargaan() {
+            document.getElementById('final-score').innerText = gameState.score;
+            const badgesContainer = document.getElementById('badges-container');
+            badgesContainer.innerHTML = '';
+            
+            if (gameState.badges.length === 0) {
+                badgesContainer.innerHTML = '<span class="text-[10px] text-gray-500">Belum ada lencana</span>';
+            } else {
+                gameState.badges.forEach(badge => {
+                    const el = document.createElement('div');
+                    el.className = 'text-3xl bg-[#2d1b11] p-2 border-2 border-[#8d6e63] rounded-full w-12 h-12 flex justify-center items-center';
+                    el.innerText = badge;
+                    badgesContainer.appendChild(el);
+                });
+            }
+        }
+
+        window.onload = () => {
+            loadProgress();
+            showScreen('screen-menu');
+        };
+
+    </script>
 </body>
 </html>
