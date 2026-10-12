@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <!-- Viewport untuk ukuran yang pas di mobile, mencegah zoom yang tidak disengaja -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Petualangan Detektif Pola Bilangan</title>
+    <!-- Memuat Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Memuat Font 8-bit Retro -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0f0f1b;
+            --primary-dark: #2d1b11;
+            --primary-light: #8d6e63;
+            --accent: #d4a373;
+            --text-color: #fefae0;
+            --success: #4ade80;
+            --danger: #f87171;
+        }
+
+        body {
+            background-color: #000;
+            color: var(--text-color);
+            font-family: 'Press Start 2P', cursive;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden; /* Mencegah scrolling browser utama */
+        }
+
+        /* Container utama game (ukuran rasio mobile portrait) */
+        #game-container {
+            width: 100%;
+            height: 100vh;
+            max-width: 480px; /* Ukuran maksimal seperti layar HP besar */
+            background-color: var(--bg-color);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(212, 163, 115, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Scanline effect untuk nuansa CRT/Retro */
+        .scanlines {
+            position: absolute;
+            top: 0; left: 0; w-full; height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* Utility classes untuk tombol bergaya pixel */
+        .pixel-btn {
+            background-color: var(--primary-dark);
+            color: var(--accent);
+            border: 4px solid var(--primary-light);
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            line-height: 1.5;
+            transition: all 0.1s;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.8);
+            position: relative;
+        }
+        
+        .pixel-btn:active {
+            transform: translate(4px, 4px);
+            box-shadow: 0px 0px 0px rgba(0,0,0,0.8);
+        }
+
+        .pixel-btn.disabled {
+            background-color: #333;
+            border-color: #555;
+            color: #777;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.5);
+        }
+
+        .pixel-panel {
+            background-color: rgba(45, 27, 17, 0.9);
+            border: 4px solid var(--primary-light);
+            padding: 1.5rem;
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.9);
+        }
+
+        /* Screen management */
+        .screen {
+            display: none;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 1rem;
+            overflow-y: auto;
+            z-index: 10;
+        }
+        .screen.active {
+            display: flex;
+        }
+
+        /* Sembunyikan scrollbar tapi tetap bisa scroll */
+        .screen::-webkit-scrollbar { display: none; }
+        .screen { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Styling Map Nodes */
+        .map-node {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: var(--primary-dark);
+            border: 4px solid #555;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1rem;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+            transition: all 0.2s;
+        }
+        .map-node.unlocked {
+            border-color: var(--accent);
+            box-shadow: 0 0 15px var(--accent);
+            animation: pulse-node 2s infinite;
+        }
+        .map-node.completed {
+            border-color: var(--success);
+            background-color: var(--success);
+            color: #000;
+            box-shadow: none;
+            animation: none;
+        }
+        
+        @keyframes pulse-node {
+            0% { box-shadow: 0 0 0 0 rgba(212, 163, 115, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(212, 163, 115, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(212, 163, 115, 0); }
+        }
+
+        /* Garis penghubung map */
+        .map-path {
+            position: absolute;
+            background-color: #555;
+            z-index: 1;
+        }
+        .map-path.unlocked {
+            background-color: var(--accent);
+        }
+
+        /* Text Input styling */
+        .pixel-input {
+            background: #000;
+            border: 4px solid var(--primary-light);
+            color: var(--success);
+            font-family: 'Press Start 2P', cursive;
+            padding: 1rem;
+            width: 100%;
+            text-align: center;
+            font-size: 1.2rem;
+            outline: none;
+        }
+
+        .typewriter {
+            overflow: hidden;
+            border-right: .15em solid var(--accent);
+            white-space: pre-wrap;
+            margin: 0 auto;
+            letter-spacing: .1em;
+            animation: typing 3s steps(40, end), blink-caret .75s step-end infinite;
+        }
+
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: var(--accent); }
+        }
+
+        /* Floating icons */
+        .float-anim {
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div class="scanlines"></div>
+
+        <!-- Audio Control -->
+        <div class="absolute top-4 right-4 z-50">
+            <button id="btn-audio" class="text-xl opacity-70 hover:opacity-100" onclick="toggleAudio()">🔇</button>
+        </div>
+
+        <!-- SCREEN: Main Menu (Beranda) -->
+        <div id="screen-menu" class="screen active justify-center items-center bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjMGYwZjFiIj48L3JlY3Q+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMxYTFhMzAiPjwvcmVjdD4KPC9zdmc+')]">
+            <div class="text-center mb-10 float-anim">
+                <div class="text-4xl mb-4">🕵️‍♂️</div>
+                <h1 class="text-2xl leading-loose text-[var(--accent)] text-shadow-md">PETUALANGAN<br>DETEKTIF<br>POLA BILANGAN</h1>
+            </div>
+            
+            <div class="flex flex-col gap-4 w-3/4 max-w-[250px]">
+                <button class="pixel-btn" onclick="startGame()">MULAI KASUS</button>
+                <button class="pixel-btn" onclick="showScreen('screen-petunjuk')">PETUNJUK</button>
+                <button class="pixel-btn" onclick="showScreen('screen-tujuan')">TUJUAN</button>
+                <button class="pixel-btn text-xs mt-4 !bg-red-900 !border-red-500 !text-white" onclick="resetData()">RESET DATA</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: Petunjuk -->
+        <div id="screen-petunjuk" class="screen justify-center items-center">
+            <div class="pixel-panel w-full">
+                <h2 class="text-xl text-[var(--accent)] mb-4 text-center">PETUNJUK</h2>
+                <p class="text-xs leading-loose mb-4">
+                    1. Pecahkan misteri pola bilangan untuk membuka area baru.<br><br>
+                    2. Kumpulkan poin dan lencana emas di setiap misi.<br><br>
+                    3. Buka Peta untuk melihat progres investigasi.<br><br>
+                    4. Progres akan otomatis tersimpan.
+                </p>
+                <button class="pixel-btn w-full mt-4" onclick="showScreen('screen-menu')">KEMBALI</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: Tujuan -->
+        <div id="screen-tujuan" class="screen justify-center items-center">
+            <div class="pixel-panel w-full">
+                <h2 class="text-xl text-[var(--accent)] mb-4 text-center">TUJUAN</h2>
+                <p class="text-[10px] leading-relaxed mb-4 text-gray-300">
+                    🔍 Peserta didik mampu mengenal dan mengidentifikasi pola bilangan sederhana.<br><br>
+                    🔍 Mampu menentukan angka yang hilang dalam urutan.<br><br>
+                    🔍 Mampu memprediksi bilangan berikutnya berdasarkan aturan pola.<br><br>
+                    🔍 Menerapkan konsep dalam pemecahan masalah (game & tantangan).
+                </p>
+                <button class="pixel-btn w-full mt-4" onclick="showScreen('screen-menu')">KEMBALI</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: World Map -->
+        <div id="screen-map" class="screen bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjMTYxNjI1Ij48L3JlY3Q+CjxwYXRoIGQ9Ik0wIDBMOCA4Wk04IDBMMCA4WiIgc3Ryb2tlPSIjMWExYTMwIiBzdHJva2Utd2lkdGg9IjEiPjwvcGF0aD4KPC9zdmc+')]">
+            <div class="flex justify-between items-center mb-6 bg-black p-2 border-2 border-[var(--primary-light)]">
+                <div class="text-xs">SKOR: <span id="ui-score" class="text-[var(--accent)]">0</span></div>
+                <button class="text-xs px-2 py-1 bg-red-900 border border-red-500" onclick="showScreen('screen-menu')">MENU</button>
+            </div>
+            
+            <h2 class="text-center text-[var(--accent)] mb-8">PETA INVESTIGASI</h2>
+            
+            <!-- Map Container -->
+            <div class="relative flex-1 w-full flex justify-center pb-20">
+                <div id="map-nodes-container" class="relative w-full max-w-[300px] h-full">
+                    <!-- Nodes will be generated here by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: Level / Gameplay -->
+        <div id="screen-level" class="screen">
+            <div class="flex justify-between items-center mb-4">
+                <button class="text-[10px] bg-gray-800 p-2 border border-gray-600" onclick="showScreen('screen-map')">◀ PETA</button>
+                <div id="level-title" class="text-xs text-[var(--accent)]">MISI 1</div>
+            </div>
+
+            <div class="pixel-panel flex-1 flex flex-col relative">
+                <!-- Konten akan diinjeksi di sini -->
+                <div id="level-content" class="flex-1 flex flex-col justify-center items-center text-center">
+                    <!-- Dynamic content -->
+                </div>
+
+                <!-- Feedback Overlay -->
+                <div id="feedback-overlay" class="absolute inset-0 bg-black bg-opacity-90 flex flex-col justify-center items-center hidden z-20">
+                    <div id="feedback-icon" class="text-6xl mb-4">✅</div>
+                    <div id="feedback-text" class="text-xl mb-6">TEPAT!</div>
+                    <button class="pixel-btn" id="btn-next-level">LANJUTKAN</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCREEN: Refleksi -->
+        <div id="screen-refleksi" class="screen justify-center">
+            <div class="pixel-panel w-full">
+                <h2 class="text-lg text-[var(--accent)] mb-4 text-center">REFLEKSI DETEKTIF</h2>
+                <p class="text-xs mb-4">Laporan Investigasi: Apa yang paling menantang dari kasus pola bilangan ini?</p>
+                <textarea id="refleksi-input" class="w-full h-32 bg-black border-2 border-[var(--primary-light)] text-white p-2 font-['Press_Start_2P'] text-[10px] mb-4" placeholder="Ketik laporanmu di sini..."></textarea>
+                <button class="pixel-btn w-full" onclick="submitRefleksi()">KIRIM LAPORAN</button>
+            </div>
+        </div>
+
+        <!-- SCREEN: Penghargaan -->
+        <div id="screen-penghargaan" class="screen justify-center items-center">
+            <div class="pixel-panel w-full text-center relative overflow-hidden">
+                <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PGNpcmNsZSBjeD0iNSIgY3k9IjUiIHI9IjEiIGZpbGw9IiNGRkQ3MDAiIG9wYWNpdHk9IjAuMiIvPjwvc3ZnPg==')] z-0"></div>
+                <div class="relative z-10">
+                    <h2 class="text-xl text-[var(--accent)] mb-2">KASUS DITUTUP</h2>
+                    <div class="text-6xl my-6 float-anim">🏆</div>
+                    <p class="text-xs mb-2">Total Skor Detektif:</p>
+                    <div id="final-score" class="text-3xl text-[var(--success)] mb-6">0</div>
+                    
+                    <div class="text-[10px] mb-2 text-gray-400">Lencana Diperoleh:</div>
+                    <div id="badges-container" class="flex justify-center gap-2 mb-8 flex-wrap">
+                        <!-- Badges go here -->
+                    </div>
+
+                    <button class="pixel-btn w-full text-xs" onclick="resetData()">MAIN LAGI</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * ==========================================
+         * MODUL DATA SOAL (GAME DATA)
+         * Anda dapat mengedit konten ini dengan mudah
+         * ==========================================
+         */
+        const GAME_DATA = [
+            {
+                id: 'materi',
+                title: 'MATERI: KONSEP',
+                type: 'info',
+                content: `Halo Detektif! Kasus kali ini adalah memecahkan misteri 'Pola Bilangan'.<br><br>Pola bilangan adalah susunan angka yang memiliki aturan tertentu.<br><br>Contoh Aturan:<br>+2 (ditambah dua)<br>x3 (dikali tiga)<br><br>Pahami polanya, dan temukan angka yang tersembunyi!`,
+                reward: 0
+            },
+            {
+                id: 'misi1',
+                title: 'MISI 1: MENGENAL',
+                type: 'mcq',
+                question: 'Amati jejak berikut:\n\n2, 4, 6, 8\n\nApa aturan dari pola di atas?',
+                options: ['Ditambah 1', 'Ditambah 2', 'Dikali 2', 'Dikurangi 2'],
+                correctAnswer: 1, // index of 'Ditambah 2'
+                reward: 100,
+                badge: '🔍'
+            },
+            {
+                id: 'misi2',
+                title: 'MISI 2: ANGKA HILANG',
+                type: 'input',
+                question: 'Sebuah brankas memiliki sandi:\n\n5, 10, ?, 20, 25\n\nKetik angka yang hilang!',
+                correctAnswer: '15',
+                reward: 150,
+                badge: '🔓'
+            },
+            {
+                id: 'misi3',
+                title: 'MISI 3: SELANJUTNYA',
+                type: 'selectPlace',
+                question: 'Jejak kaki perampok bernomor:\n\n1, 3, 6, 10, [ ? ]\n\nPilih angka selanjutnya!',
+                options: [12, 14, 15, 16],
+                correctAnswer: 2, // index of 15
+                reward: 200,
+                badge: '👣'
+            },
+            {
+                id: 'game',
+                title: 'GAME: WAKTU',
+                type: 'timedGame',
+                question: 'Retas sistem dalam 15 detik!\n\n100, 90, 80, ?',
+                options: [70, 60, 50, 40],
+                correctAnswer: 0,
+                timeLimit: 15,
+                reward: 300,
+                badge: '⏱️'
+            },
+            {
+                id: 'tantangan',
+                title: 'TANTANGAN',
+                type: 'mcq',
+                question: 'Di ruang sidang, baris pertama ada 5 kursi. Baris kedua ada 8 kursi, baris ketiga ada 11 kursi. Berapa kursi di baris keempat?',
+                options: ['12', '13', '14', '15'],
+                correctAnswer: 2, // 14
+                reward: 200,
+                badge: '🧠'
+            },
+            {
+                id: 'kuis',
+                title: 'KUIS AKHIR',
+                type: 'mcq',
+                question: 'Ujian terakhir Detektif!\n\nPola: 2, 6, 18, 54, ...\nAturannya adalah?',
+                options: ['Tambah 4', 'Kali 2', 'Kali 3', 'Pangkat 2'],
+                correctAnswer: 2, // Kali 3
+                reward: 250,
+                badge: '⭐'
+            },
+            {
+                id: 'refleksi',
+                title: 'REFLEKSI',
+                type: 'reflection'
+            },
+            {
+                id: 'penghargaan',
+                title: 'PENGHARGAAN',
+                type: 'rewards'
+            }
+        ];
+
+        // Audio System
+        let audioCtx;
+        let isMuted = false;
+        let bgmOscillator = null;
+        let bgmGain = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSFX(type) {
+            if (isMuted || !audioCtx) return;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'click') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'correct') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.setValueAtTime(800, now + 0.1);
+                osc.frequency.setValueAtTime(1000, now + 0.2);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.linearRampToValueAtTime(100, now + 0.3);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            }
+        }
+
+        function startBGM() {
+            if (isMuted || !audioCtx || bgmOscillator) return;
+            
+            bgmOscillator = audioCtx.createOscillator();
+            bgmGain = audioCtx.createGain();
+            
+            bgmOscillator.type = 'triangle';
+            bgmGain.gain.value = 0.05; // Sangat pelan sebagai ambience
+            
+            bgmOscillator.connect(bgmGain);
+            bgmGain.connect(audioCtx.destination);
+            
+            // Simple eerie bass loop using an interval to modulate frequency
+            const notes = [130.81, 155.56, 196.00, 155.56]; // C3, D#3, G3, D#3
+            let noteIndex = 0;
+            
+            bgmOscillator.start();
+            
+            setInterval(() => {
+                if(bgmOscillator && !isMuted) {
+                    bgmOscillator.frequency.setTargetAtTime(notes[noteIndex], audioCtx.currentTime, 0.1);
+                    noteIndex = (noteIndex + 1) % notes.length;
+                }
+            }, 1000);
+        }
+
+        function stopBGM() {
+            if (bgmOscillator) {
+                bgmOscillator.stop();
+                bgmOscillator.disconnect();
+                bgmOscillator = null;
+            }
+        }
+
+        function toggleAudio() {
+            initAudio();
+            isMuted = !isMuted;
+            const btn = document.getElementById('btn-audio');
+            if (isMuted) {
+                btn.innerText = '🔇';
+                stopBGM();
+            } else {
+                btn.innerText = '🔊';
+                startBGM();
+                playSFX('click');
+            }
+        }
+
+        // State Management
+        let gameState = {
+            currentLevelIndex: 0, // Level maksimal yang terbuka
+            score: 0,
+            badges: []
+        };
+        
+        let currentPlayingLevel = 0; // Level yang sedang dimainkan saat ini
+        let timerInterval = null;
+
+        const STORAGE_KEY = 'detektifPolaState';
+
+        function loadProgress() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    gameState = JSON.parse(saved);
+                    // Validasi struktur jika ada update versi game
+                    if(typeof gameState.currentLevelIndex !== 'number') gameState.currentLevelIndex = 0;
+                    if(!gameState.badges) gameState.badges = [];
+                } catch(e) {
+                    console.error("Gagal memuat save data");
+                }
+            }
+        }
+
+        function saveProgress() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+        }
+
+        function resetData() {
+            playSFX('click');
+            // Menggunakan custom modal instead of confirm()
+            const screen = document.createElement('div');
+            screen.className = 'absolute inset-0 bg-black bg-opacity-90 z-[100] flex justify-center items-center p-4';
+            screen.innerHTML = `
+                <div class="pixel-panel text-center">
+                    <h3 class="text-red-500 mb-4">HAPUS DATA?</h3>
+                    <p class="text-[10px] mb-6">Semua progres akan hilang selamanya.</p>
+                    <div class="flex gap-4 justify-center">
+                        <button class="pixel-btn !bg-red-900" id="btn-confirm-reset">YA, HAPUS</button>
+                        <button class="pixel-btn" id="btn-cancel-reset">BATAL</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('game-container').appendChild(screen);
+
+            document.getElementById('btn-confirm-reset').onclick = () => {
+                localStorage.removeItem(STORAGE_KEY);
+                gameState = { currentLevelIndex: 0, score: 0, badges: [] };
+                screen.remove();
+                showScreen('screen-menu');
+            };
+            document.getElementById('btn-cancel-reset').onclick = () => {
+                screen.remove();
+            };
+        }
+
+        // Screen Routing
+        function showScreen(screenId) {
+            playSFX('click');
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            if (screenId === 'screen-map') {
+                renderMap();
+            } else if (screenId === 'screen-penghargaan') {
+                renderPenghargaan();
+            }
+        }
+
+        function startGame() {
+            initAudio(); // Harus dipanggil dari interaksi user
+            if(!isMuted) startBGM();
+            showScreen('screen-map');
+        }
+
+        function renderMap() {
+            document.getElementById('ui-score').innerText = gameState.score;
+            const container = document.getElementById('map-nodes-container');
+            container.innerHTML = '';
+
+            // Buat layout zig-zag
+            let currentY = 0;
+            const ySpacing = 80;
+            const xPositions = ['20%', '50%', '80%', '50%']; // Pola zig zag
+
+            GAME_DATA.forEach((level, index) => {
+                const isUnlocked = index <= gameState.currentLevelIndex;
+                const isCompleted = index < gameState.currentLevelIndex;
+                
+                const xPos = xPositions[index % xPositions.length];
+
+                // Create Path Line to next node (kecuali node terakhir)
+                if (index < GAME_DATA.length - 1) {
+                    const nextXPos = xPositions[(index + 1) % xPositions.length];
+                    const path = document.createElement('div');
+                    path.className = `map-path ${isCompleted ? 'unlocked' : ''}`;
+                    
+                    // Simple logic for vertical/diagonal paths using CSS
+                    path.style.top = `${currentY + 24}px`;
+                    path.style.left = xPos;
+                    path.style.width = '2px';
+                    path.style.height = `${ySpacing}px`;
+                    
+                    // Basic diagonal transform calc (simplified for visual effect)
+                    if (xPos !== nextXPos) {
+                        const isRight = parseInt(nextXPos) > parseInt(xPos);
+                        path.style.transformOrigin = 'top left';
+                        path.style.transform = `rotate(${isRight ? '-30deg' : '30deg'})`;
+                        path.style.height = `${ySpacing * 1.2}px`; // Panjang garis miring
+                    }
+                    
+                    container.appendChild(path);
+                }
+
+                // Create Node
+                const node = document.createElement('div');
+                node.className = `map-node absolute ${isUnlocked ? 'unlocked' : ''} ${isCompleted ? 'completed' : ''} shadow-lg`;
+                node.style.top = `${currentY}px`;
+                node.style.left = `calc(${xPos} - 24px)`;
+                
+                // Icon based on status
+                if (isCompleted) {
+                    node.innerHTML = '✓';
+                } else if (isUnlocked) {
+                    node.innerHTML = level.id === 'penghargaan' ? '🏆' : '🔎';
+                } else {
+                    node.innerHTML = '🔒';
+                    node.style.opacity = '0.5';
+                }
+
+                node.onclick = () => {
+                    if (isUnlocked) {
+                        playLevel(index);
+                    } else {
+                        playSFX('wrong');
+                    }
+                };
+
+                // Label
+                const label = document.createElement('div');
+                label.className = 'absolute text-[8px] whitespace-nowrap text-center text-gray-300 bg-black bg-opacity-70 px-1 mt-14';
+                label.innerText = level.title.split(':')[0]; // Ambil kata pertama (Misi 1, dll)
+                node.appendChild(label);
+
+                container.appendChild(node);
+                
+                currentY += ySpacing;
+            });
+            
+            // Sesuaikan tinggi container
+            container.style.height = `${currentY}px`;
+        }
+
+        function playLevel(index) {
+            currentPlayingLevel = index;
+            const levelData = GAME_DATA[index];
+            
+            if (levelData.type === 'reflection') {
+                showScreen('screen-refleksi');
+                return;
+            }
+            if (levelData.type === 'rewards') {
+                showScreen('screen-penghargaan');
+                return;
+            }
+
+            document.getElementById('level-title').innerText = levelData.title;
+            const contentDiv = document.getElementById('level-content');
+            contentDiv.innerHTML = '';
+            
+            document.getElementById('feedback-overlay').classList.add('hidden');
+            clearInterval(timerInterval);
+
+            // Container soal
+            const qBox = document.createElement('div');
+            qBox.className = 'bg-[#1a1a2e] p-4 border-2 border-[#8d6e63] w-full mb-6 rounded-md shadow-inner text-left text-xs leading-loose whitespace-pre-wrap';
+            qBox.innerText = levelData.content || levelData.question;
+            contentDiv.appendChild(qBox);
+
+            // Render berdasarkan tipe
+            if (levelData.type === 'info') {
+                const btn = document.createElement('button');
+                btn.className = 'pixel-btn w-full mt-auto';
+                btn.innerText = 'MENGERTI, LANJUTKAN!';
+                btn.onclick = () => handleCorrectAnswer();
+                contentDiv.appendChild(btn);
+            } 
+            else if (levelData.type === 'mcq') {
+                const optGrid = document.createElement('div');
+                optGrid.className = 'grid grid-cols-1 gap-4 w-full';
+                levelData.options.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'pixel-btn w-full text-left !normal-case !text-xs';
+                    btn.innerText = opt;
+                    btn.onclick = () => checkAnswer(i === levelData.correctAnswer);
+                    optGrid.appendChild(btn);
+                });
+                contentDiv.appendChild(optGrid);
+            }
+            else if (levelData.type === 'input') {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'pixel-input mb-4';
+                input.placeholder = '?';
+                
+                const btn = document.createElement('button');
+                btn.className = 'pixel-btn w-full';
+                btn.innerText = 'JAWAB';
+                btn.onclick = () => {
+                    checkAnswer(input.value.trim() === levelData.correctAnswer);
+                };
+                
+                contentDiv.appendChild(input);
+                contentDiv.appendChild(btn);
+            }
+            else if (levelData.type === 'selectPlace') {
+                // Mekanik Select and Place (Simulasi Drag Drop)
+                const slotArea = document.createElement('div');
+                slotArea.className = 'text-2xl mb-6 text-gray-500 border-2 border-dashed border-gray-500 p-4 w-full text-center bg-black';
+                slotArea.innerText = '[ PILIH ANGKA DI BAWAH ]';
+                
+                const optGrid = document.createElement('div');
+                optGrid.className = 'grid grid-cols-2 gap-4 w-full';
+                levelData.options.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'pixel-btn';
+                    btn.innerText = opt;
+                    btn.onclick = () => {
+                        slotArea.innerText = `[ ${opt} ]`;
+                        slotArea.classList.remove('text-gray-500', 'border-gray-500');
+                        slotArea.classList.add('text-white', 'border-[var(--accent)]');
+                        
+                        // Beri delay sedikit agar terlihat diproses
+                        setTimeout(() => {
+                             checkAnswer(i === levelData.correctAnswer);
+                        }, 500);
+                    };
+                    optGrid.appendChild(btn);
+                });
+                
+                contentDiv.appendChild(slotArea);
+                contentDiv.appendChild(optGrid);
+            }
+            else if (levelData.type === 'timedGame') {
+                const timerDisplay = document.createElement('div');
+                timerDisplay.className = 'text-2xl text-[var(--danger)] mb-4 animate-pulse';
+                timerDisplay.innerText = `00:${levelData.timeLimit.toString().padStart(2, '0')}`;
+                contentDiv.insertBefore(timerDisplay, qBox);
+
+                let timeLeft = levelData.timeLimit;
+                timerInterval = setInterval(() => {
+                    timeLeft--;
+                    timerDisplay.innerText = `00:${timeLeft.toString().padStart(2, '0')}`;
+                    if(timeLeft <= 3) timerDisplay.classList.add('text-red-500', 'scale-110');
+                    if(timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        checkAnswer(false, true); // timeout
+                    }
+                }, 1000);
+
+                const optGrid = document.createElement('div');
+                optGrid.className = 'grid grid-cols-2 gap-4 w-full mt-4';
+                levelData.options.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'pixel-btn';
+                    btn.innerText = opt;
+                    btn.onclick = () => {
+                        clearInterval(timerInterval);
+                        checkAnswer(i === levelData.correctAnswer);
+                    };
+                    optGrid.appendChild(btn);
+                });
+                contentDiv.appendChild(optGrid);
+            }
+
+            showScreen('screen-level');
+        }
+
+        function checkAnswer(isCorrect, isTimeout = false) {
+            const overlay = document.getElementById('feedback-overlay');
+            const icon = document.getElementById('feedback-icon');
+            const text = document.getElementById('feedback-text');
+            const btnNext = document.getElementById('btn-next-level');
+
+            overlay.classList.remove('hidden');
+
+            if (isCorrect) {
+                playSFX('correct');
+                icon.innerText = '✅';
+                text.innerText = 'KODE DIPECAHKAN!';
+                text.className = 'text-xl mb-6 text-[var(--success)]';
+                btnNext.innerText = 'LANJUTKAN';
+                
+                btnNext.onclick = handleCorrectAnswer;
+            } else {
+                playSFX('wrong');
+                icon.innerText = '❌';
+                text.innerText = isTimeout ? 'WAKTU HABIS!' : 'SANDI SALAH!';
+                text.className = 'text-xl mb-6 text-[var(--danger)]';
+                btnNext.innerText = 'COBA LAGI';
+                
+                btnNext.onclick = () => {
+                    overlay.classList.add('hidden');
+                    playLevel(currentPlayingLevel); // Reload level
+                };
+            }
+        }
+
+        function handleCorrectAnswer() {
+            const levelData = GAME_DATA[currentPlayingLevel];
+            
+            // Hanya tambah skor/lencana jika level ini baru diselesaikan (bukan replay)
+            if (currentPlayingLevel === gameState.currentLevelIndex) {
+                if (levelData.reward) {
+                    gameState.score += levelData.reward;
+                }
+                if (levelData.badge && !gameState.badges.includes(levelData.badge)) {
+                    gameState.badges.push(levelData.badge);
+                }
+                
+                // Buka level berikutnya
+                gameState.currentLevelIndex++;
+                saveProgress();
+            }
+
+            // Kembali ke map
+            showScreen('screen-map');
+        }
+
+        function submitRefleksi() {
+            const input = document.getElementById('refleksi-input').value;
+            if (input.trim() === '') {
+                // Custom alert look-alike
+                const btn = document.querySelector('#screen-refleksi button');
+                const oriText = btn.innerText;
+                btn.innerText = 'ISI LAPORAN DULU!';
+                btn.classList.add('!bg-red-800');
+                playSFX('wrong');
+                setTimeout(() => {
+                    btn.innerText = oriText;
+                    btn.classList.remove('!bg-red-800');
+                }, 2000);
+                return;
+            }
+            
+            playSFX('correct');
+            if (currentPlayingLevel === gameState.currentLevelIndex) {
+                gameState.currentLevelIndex++;
+                saveProgress();
+            }
+            
+            // Langsung ke layar penghargaan
+            showScreen('screen-penghargaan');
+        }
+
+        function renderPenghargaan() {
+            document.getElementById('final-score').innerText = gameState.score;
+            
+            const badgesContainer = document.getElementById('badges-container');
+            badgesContainer.innerHTML = '';
+            
+            if (gameState.badges.length === 0) {
+                badgesContainer.innerHTML = '<span class="text-[10px] text-gray-500">Belum ada lencana</span>';
+            } else {
+                gameState.badges.forEach(badge => {
+                    const el = document.createElement('div');
+                    el.className = 'text-3xl bg-[#2d1b11] p-2 border-2 border-[#8d6e63] rounded-full w-12 h-12 flex justify-center items-center';
+                    el.innerText = badge;
+                    badgesContainer.appendChild(el);
+                });
+            }
+        }
+
+        // Initialize game on load
+        window.onload = () => {
+            loadProgress();
+            // Start at menu
+            showScreen('screen-menu');
+        };
+
+    </script>
+</body>
+</html>
